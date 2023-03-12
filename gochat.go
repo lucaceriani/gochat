@@ -16,10 +16,9 @@ type Message struct {
 }
 
 type ChatSend struct {
-	Model     string    `json:"model"`
-	Stream    bool      `json:"stream"`
-	MaxTokens int       `json:"max_tokens"` // 1024
-	Messages  []Message `json:"messages"`
+	Model    string    `json:"model"`
+	Stream   bool      `json:"stream"`
+	Messages []Message `json:"messages"`
 }
 
 type ChatResponseEvent struct {
@@ -35,17 +34,17 @@ type ChatResponseEvent struct {
 }
 
 type Options struct {
-	NoHistory bool
+	History bool
+	Debug   bool
 }
 
-func getKey() string {
-	key, err := os.ReadFile("api.key")
-	if err != nil {
-		panic(err)
+var (
+	promptChar string
+	options    = Options{
+		History: false,
+		Debug:   false,
 	}
-
-	return strings.TrimSpace(string(key))
-}
+)
 
 func readAndPrintReponse(res *http.Response) Message {
 	defer res.Body.Close()
@@ -57,16 +56,22 @@ func readAndPrintReponse(res *http.Response) Message {
 
 	for {
 		n, err := res.Body.Read(tmpBuf)
-		if err != nil {
-			break
+		if err != nil && err.Error() != "EOF" {
+			panic("Error reading response body: " + err.Error())
 		}
 
 		toParseNext += string(tmpBuf[:n])
 
+		if options.Debug {
+			fmt.Println("\n--- DEBUG START ---")
+			fmt.Println("To parse next: ")
+			fmt.Println(toParseNext)
+		}
+
 		// get the index of the first \n\n
 		idxNN := strings.Index(toParseNext, "\n\n")
 		if idxNN == -1 {
-			continue
+			continue // to read more data
 		}
 
 		// parse the first part of the string until the first \n\n
@@ -74,8 +79,14 @@ func readAndPrintReponse(res *http.Response) Message {
 		// remove the first part of the string until the first \n\n
 		toParseNext = toParseNext[idxNN+2:]
 
+		if options.Debug {
+			fmt.Println("To parse: ")
+			fmt.Println(toParse)
+			fmt.Println("--- DEBUG END ---")
+		}
+
 		if toParse == "data: [DONE]" {
-			fmt.Println("--- DONE ---")
+			break // end of the stream
 		} else if strings.HasPrefix(toParse, "data: ") {
 			toParse = toParse[6:]
 
@@ -96,9 +107,14 @@ func readAndPrintReponse(res *http.Response) Message {
 			// print the message chunk
 			fmt.Print(contentChunk)
 		} else {
-			panic("cannot find 'data:' in stream")
+			panic("Cannot find 'data:' in stream")
 		}
 
+		// if the error is not nil (hopefully EOF) and there is nothing else to parse
+		// then we can break the loop
+		if err != nil && toParseNext == "" {
+			break
+		}
 	}
 
 	// print a newline at the end of the message
@@ -109,36 +125,71 @@ func readAndPrintReponse(res *http.Response) Message {
 }
 
 func main() {
-	key := getKey()
-	var messages []Message
-	options := Options{
-		NoHistory: false,
+
+	if len(os.Args) == 2 {
+		if os.Args[1] == "setup" {
+			setup()
+		}
 	}
+
+	key, err := getKey()
+
+	if err != nil {
+		fmt.Println("Error: ", err)
+		os.Exit(1)
+	}
+
+	fmt.Println(`
+  ___  _____  ___  _   _    __   ____ 
+ / __)(  _  )/ __)( )_( )  /__\ (_  _)
+( (_-. )(_)(( (__  ) _ (  /(__)\  )(  
+ \___/(_____)\___)(_) (_)(__)(__)(__)    v 0.1
+	`)
+
+	var messages []Message
 
 mainLoop:
 	for {
-		if options.NoHistory {
+
+		if !options.History {
 			messages = []Message{}
+			promptChar = ">"
+		} else {
+			promptChar = ">>"
 		}
 
-		fmt.Print("\n> ")
+		fmt.Print("\n" + promptChar + " ")
 		userInput, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		userInput = strings.TrimSpace(userInput)
 
-		// exit if the user types "exit"
-		switch userInput {
+		switch strings.Split(userInput, " ")[0] {
 		case "/exit":
 			break mainLoop
 		case "/reset":
 			messages = []Message{}
 			continue
-		case "/debug":
-			ppjson, _ := json.MarshalIndent(messages, "", "  ")
-			fmt.Println(string(ppjson))
+		case "/history":
+			spl := strings.Split(userInput, " ")
+			if len(spl) == 2 && spl[1] == "on" {
+				options.History = true
+			} else if len(spl) == 2 && spl[1] == "off" {
+				options.History = false
+			} else {
+				fmt.Printf("History: %v\n", options.History)
+			}
 			continue
-		case "/nohistory":
-			options.NoHistory = !options.NoHistory
-			fmt.Printf("NoHistory: %v\n", options.NoHistory)
+		case "/debug":
+			spl := strings.Split(userInput, " ")
+			if len(spl) == 2 && spl[1] == "on" {
+				options.Debug = true
+			} else if len(spl) == 2 && spl[1] == "off" {
+				options.Debug = false
+			} else {
+				fmt.Printf("Debug: %v\n", options.Debug)
+			}
+			continue
+		case "/key":
+			fmt.Printf("API Key: %s\n", key)
 			continue
 		case "/len":
 			acc := 0
@@ -152,12 +203,12 @@ mainLoop:
 		case "/help":
 			fmt.Println("\nAvailable commands:")
 			fmt.Println("")
-			fmt.Println("  /exit:  exit the program")
-			fmt.Println("  /reset: reset the conversation")
-			fmt.Println("  /debug: print the conversation history")
-			fmt.Println("  /nohistory: toggle the history (default: false)")
-			fmt.Println("  /len:   print the length and the cost of the conversation")
-			fmt.Println("  /help:  print this message")
+			fmt.Println("  /reset  ............. Reset the conversation (when history is on)")
+			fmt.Println("  /len ................ Show the length and the cost of the conversation")
+			fmt.Println("  /key ................ Show the API key")
+			fmt.Println("  /debug [on|off]...... Show each chunk of the response (default: off)")
+			fmt.Println("  /history [on|off] ... Toggles the history (default: off)")
+			fmt.Println("  /exit ............... Exit the program")
 			continue
 		}
 
