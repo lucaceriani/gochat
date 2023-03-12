@@ -10,36 +10,10 @@ import (
 	"strings"
 )
 
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type ChatSend struct {
-	Model    string    `json:"model"`
-	Stream   bool      `json:"stream"`
-	Messages []Message `json:"messages"`
-}
-
-type ChatResponseEvent struct {
-	Id      string `json:"id"`
-	Object  string `json:"object"`
-	Created int64  `json:"created"`
-	Model   string `json:"model"`
-	Choices []struct {
-		Delta        Message `json:"delta"`
-		Index        int     `json:"index"`
-		FinishReason string  `json:"finish_reason"`
-	} `json:"choices"`
-}
-
-type Options struct {
-	History bool
-	Debug   bool
-}
-
 var (
+	key        string
 	promptChar string
+	messages   = []Message{}
 	options    = Options{
 		History: false,
 		Debug:   false,
@@ -132,7 +106,8 @@ func main() {
 		}
 	}
 
-	key, err := getKey()
+	var err error = nil
+	key, err = getKey()
 
 	if err != nil {
 		fmt.Println("Error: ", err)
@@ -140,15 +115,12 @@ func main() {
 	}
 
 	fmt.Println(`
-  ___  _____  ___  _   _    __   ____ 
- / __)(  _  )/ __)( )_( )  /__\ (_  _)
-( (_-. )(_)(( (__  ) _ (  /(__)\  )(  
- \___/(_____)\___)(_) (_)(__)(__)(__)    v 0.1
+  ___  _____    ___  _   _    __   ____ 
+ / __)(  _  )  / __)( )_( )  /__\ (_  _)  yourself ~
+( (_-. )(_)(  ( (__  ) _ (  /(__)\  )(  
+ \___/(_____)  \___)(_) (_)(__)(__)(__)  v 0.1
 	`)
 
-	var messages []Message
-
-mainLoop:
 	for {
 
 		if !options.History {
@@ -162,54 +134,11 @@ mainLoop:
 		userInput, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		userInput = strings.TrimSpace(userInput)
 
-		switch strings.Split(userInput, " ")[0] {
-		case "/exit":
-			break mainLoop
-		case "/reset":
-			messages = []Message{}
+		menuResult := menu(userInput)
+		if menuResult == "continue" {
 			continue
-		case "/history":
-			spl := strings.Split(userInput, " ")
-			if len(spl) == 2 && spl[1] == "on" {
-				options.History = true
-			} else if len(spl) == 2 && spl[1] == "off" {
-				options.History = false
-			} else {
-				fmt.Printf("History: %v\n", options.History)
-			}
-			continue
-		case "/debug":
-			spl := strings.Split(userInput, " ")
-			if len(spl) == 2 && spl[1] == "on" {
-				options.Debug = true
-			} else if len(spl) == 2 && spl[1] == "off" {
-				options.Debug = false
-			} else {
-				fmt.Printf("Debug: %v\n", options.Debug)
-			}
-			continue
-		case "/key":
-			fmt.Printf("API Key: %s\n", key)
-			continue
-		case "/len":
-			acc := 0
-			for _, m := range messages {
-				acc += len(m.Content)
-			}
-			fmt.Printf("Messages: %d\n", len(messages))
-			fmt.Printf("  Tokens: %d\n", acc/4)
-			fmt.Printf("    Cost: $%.6f (@ $0.002/1k tokens)\n", float64(acc/4)/1000*0.002)
-			continue
-		case "/help":
-			fmt.Println("\nAvailable commands:")
-			fmt.Println("")
-			fmt.Println("  /reset  ............. Reset the conversation (when history is on)")
-			fmt.Println("  /len ................ Show the length and the cost of the conversation")
-			fmt.Println("  /key ................ Show the API key")
-			fmt.Println("  /debug [on|off]...... Show each chunk of the response (default: off)")
-			fmt.Println("  /history [on|off] ... Toggles the history (default: off)")
-			fmt.Println("  /exit ............... Exit the program")
-			continue
+		} else if menuResult == "break" {
+			break
 		}
 
 		messages = append(messages, Message{
