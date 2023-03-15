@@ -4,17 +4,20 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
 )
 
 var (
-	key        string
-	promptChar string
-	messages   = []Message{}
-	options    = Options{
+	key            string
+	promptChar     string
+	messages       = []Message{}
+	nonInteractive = false
+	options        = Options{
 		History: false,
 		Debug:   false,
 	}
@@ -106,20 +109,45 @@ func main() {
 		}
 	}
 
+	var pFlag string
+	flag.StringVar(&pFlag, "p", "", "Prompt before the pipe input")
+	flag.Parse()
+
+	// Get any input from a pipe
+	fi, _ := os.Stdin.Stat()
+	if (fi.Mode() & os.ModeCharDevice) == 0 {
+		nonInteractive = true
+		pipeReader := io.Reader(os.Stdin)
+		pipeContent, _ := io.ReadAll(pipeReader)
+
+		if pFlag != "" {
+			pFlag += "\n\n---\n\n" + string(pipeContent)
+		} else {
+			pFlag = string(pipeContent)
+		}
+	}
+
+	// also if the user has passed a prompt flag
+	if pFlag != "" {
+		nonInteractive = true
+	}
+
 	var err error = nil
 	key, err = getKey()
 
 	if err != nil {
-		fmt.Println("Error: ", err)
+		fmt.Println("\nError: ", err)
 		os.Exit(1)
 	}
 
-	fmt.Println(`
+	if !nonInteractive {
+		fmt.Println(`
   ___  _____    ___  _   _    __   ____ 
  / __)(  _  )  / __)( )_( )  /__\ (_  _)  yourself ~
 ( (_-. )(_)(  ( (__  ) _ (  /(__)\  )(  
- \___/(_____)  \___)(_) (_)(__)(__)(__)  v 0.1
+ \___/(_____)  \___)(_) (_)(__)(__)(__)  v 0.2
 	`)
+	}
 
 	for {
 
@@ -130,15 +158,25 @@ func main() {
 			promptChar = ">>"
 		}
 
-		fmt.Print("\n" + promptChar + " ")
-		userInput, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-		userInput = strings.TrimSpace(userInput)
+		userInput := ""
 
-		menuResult := menu(userInput)
-		if menuResult == "continue" {
-			continue
-		} else if menuResult == "break" {
-			break
+		if nonInteractive {
+			userInput = pFlag
+			pFlag = ""
+		} else {
+			fmt.Print("\n" + promptChar + " ")
+			userInput, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+			userInput = strings.TrimSpace(userInput)
+		}
+
+		// exclude commands from the menu
+		if !nonInteractive {
+			menuResult := menu(userInput)
+			if menuResult == "continue" {
+				continue
+			} else if menuResult == "break" {
+				break
+			} // else go on
 		}
 
 		messages = append(messages, Message{
@@ -168,6 +206,10 @@ func main() {
 		reponseMessage := readAndPrintReponse(res)
 
 		messages = append(messages, reponseMessage)
+
+		if nonInteractive {
+			break
+		}
 	}
 
 }

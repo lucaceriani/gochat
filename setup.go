@@ -82,7 +82,7 @@ func getKey() (string, error) {
 
 	// decrypt the key with the password
 	splitted := strings.Split(string(keyFileContents), "\n")
-	if len(splitted) != 3 {
+	if len(splitted) < 3 {
 		panic("invalid key file")
 	}
 
@@ -97,8 +97,7 @@ func getKey() (string, error) {
 	}
 
 	// ask the user for the password
-	fmt.Println("Password for decryption: ")
-	fmt.Print("> ")
+	fmt.Print("Password for decryption: ")
 	bytePass, _ := term.ReadPassword(int(syscall.Stdin))
 	password := strings.TrimSpace(string(bytePass))
 
