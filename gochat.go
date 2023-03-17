@@ -9,12 +9,16 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
+
+	"gochat/tts"
 )
 
 var (
 	key            string
 	promptChar     string
+	model          string
 	messages       = []Message{}
 	nonInteractive = false
 	options        = Options{
@@ -110,8 +114,25 @@ func main() {
 	}
 
 	var pFlag string
+	var isTTS bool
 	flag.StringVar(&pFlag, "p", "", "Prompt before the pipe input")
+	flag.StringVar(&model, "m", "gpt-4", "Use a specific model (gpt-4 or gpt-3.5-turbo)")
+	flag.BoolVar(&isTTS, "tts", false, "Use text-to-speech")
 	flag.Parse()
+
+	if model == "4" || model == "gpt-4" {
+		model = "gpt-4"
+	} else if model == "3.5" || model == "gpt-3.5-turbo" {
+		model = "gpt-3.5-turbo"
+	} else {
+		fmt.Println("Error: invalid model")
+		os.Exit(1)
+	}
+
+	if isTTS && runtime.GOOS != "windows" {
+		fmt.Println("Error: text-to-speech is only available on Windows")
+		os.Exit(1)
+	}
 
 	// Get any input from a pipe
 	fi, _ := os.Stdin.Stat()
@@ -141,12 +162,12 @@ func main() {
 	}
 
 	if !nonInteractive {
-		fmt.Println(`
+		fmt.Print(`
   ___  _____    ___  _   _    __   ____ 
  / __)(  _  )  / __)( )_( )  /__\ (_  _)  yourself ~
 ( (_-. )(_)(  ( (__  ) _ (  /(__)\  )(  
- \___/(_____)  \___)(_) (_)(__)(__)(__)  v 0.2
-	`)
+ \___/(_____)  \___)(_) (_)(__)(__)(__) `)
+		fmt.Printf(" v 0.3 (%s)\n", model)
 	}
 
 	for {
@@ -164,9 +185,18 @@ func main() {
 			userInput = pFlag
 			pFlag = ""
 		} else {
+			if isTTS {
+				tts.VoiceInputToggle()
+			}
+
 			fmt.Print("\n" + promptChar + " ")
 			userInput, _ = bufio.NewReader(os.Stdin).ReadString('\n')
 			userInput = strings.TrimSpace(userInput)
+
+			if isTTS {
+				tts.VoiceInputToggle()
+			}
+
 		}
 
 		// exclude commands from the menu
@@ -185,7 +215,7 @@ func main() {
 		})
 
 		toSend := ChatSend{
-			Model:    "gpt-3.5-turbo",
+			Model:    model,
 			Stream:   true,
 			Messages: messages,
 		}
@@ -206,6 +236,10 @@ func main() {
 		reponseMessage := readAndPrintReponse(res)
 
 		messages = append(messages, reponseMessage)
+
+		if isTTS {
+			tts.Say(reponseMessage.Content)
+		}
 
 		if nonInteractive {
 			break
