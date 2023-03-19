@@ -116,7 +116,7 @@ func main() {
 	var pFlag string
 	var isTTS bool
 	flag.StringVar(&pFlag, "p", "", "Prompt before the pipe input")
-	flag.StringVar(&model, "m", "gpt-4", "Use a specific model (gpt-4 or gpt-3.5-turbo)")
+	flag.StringVar(&model, "m", "3.5", "Use a specific model (gpt-4 or gpt-3.5-turbo)")
 	flag.BoolVar(&isTTS, "tts", false, "Use text-to-speech")
 	flag.Parse()
 
