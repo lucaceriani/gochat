@@ -1,4 +1,4 @@
-package main
+package app
 
 type Message struct {
 	Role    string `json:"role"`

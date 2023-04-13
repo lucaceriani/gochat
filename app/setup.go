@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"bufio"
@@ -106,7 +106,7 @@ func getKey() (string, error) {
 }
 
 // setup function, it has to
-func setup() {
+func Setup() {
 	fmt.Print("GoChat initial setup\n\n")
 
 	// 1. ask the user for the api key
