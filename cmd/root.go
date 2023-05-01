@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"gochat/app"
-	"gochat/prompts"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -12,10 +11,8 @@ import (
 var model string = "gpt-3.5-turbo"
 
 func init() {
-	rootCmd.PersistentFlags().StringP("prompt", "p", "", "Prompt before the pipe input")
-	rootCmd.PersistentFlags().StringP("model", "m", "3.5", "[3.5 | 4] Use a specific model gpt-3.5-turbo or gpt-4")
-
-	rootCmd.PersistentFlags().Bool("as-command", false, "Return the response as a bash command")
+	rootCmd.Flags().StringP("prompt", "p", "", "Prompt before the pipe input")
+	rootCmd.PersistentFlags().BoolP("gpt-4", "4", false, "Use gpt-4")
 
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 }
@@ -23,13 +20,9 @@ func init() {
 var rootCmd = &cobra.Command{
 	Use:   "gochat",
 	Short: "gochat is a command line interface for OpenAI ChatGPT models 3.5 and 4",
-	PreRun: func(cmd *cobra.Command, args []string) {
-		if cmd.Flag("model").Value.String() == "4" {
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if cmd.Flag("gpt-4").Changed {
 			model = "gpt-4"
-		}
-
-		if cmd.Flag("as-command").Value.String() == "true" {
-			cmd.Flag("prompt").Value.Set(prompts.PromptBashCommand + cmd.Flag("prompt").Value.String())
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {

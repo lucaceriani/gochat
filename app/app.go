@@ -97,7 +97,7 @@ func readAndPrintReponse(res *http.Response) Message {
 
 }
 
-func Run(fPrompt string, fModel string) {
+func Run(fPrompt string, fModel string) string {
 
 	// Get any input from a pipe
 	fi, _ := os.Stdin.Stat()
@@ -130,7 +130,7 @@ func Run(fPrompt string, fModel string) {
  / __)(  _  )  / __)( )_( )  /__\ (_  _)  yourself ~
 ( (_-. )(_)(  ( (__  ) _ (  /(__)\  )(  
  \___/(_____)  \___)(_) (_)(__)(__)(__) `)
-		fmt.Printf(" v 0.4 (%s)\n", fModel)
+		fmt.Printf(" v 0.5 (%s)\n", fModel)
 	}
 
 	for {
@@ -193,8 +193,9 @@ func Run(fPrompt string, fModel string) {
 		messages = append(messages, reponseMessage)
 
 		if nonInteractive {
-			break
+			return reponseMessage.Content
 		}
 	}
 
+	return ""
 }

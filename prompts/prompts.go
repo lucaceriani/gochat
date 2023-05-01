@@ -6,4 +6,5 @@ Return a CLI command and nothing else - do not send it in a code block, quotes, 
 just the pure text CONTAINING ONLY THE COMMAND. If possible, return a one-line bash command or chain
 many commands together. Return ONLY the command ready to run in the terminal.
 The command should do the following:
+
 `
